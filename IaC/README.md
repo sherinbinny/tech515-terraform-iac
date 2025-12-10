@@ -78,25 +78,27 @@ Infrastructure as Code (IaC) can do all the provisioning of:
 - Consistency and accuracy
 - Version control
 - Scalable
+-
 
 <br>
 
 ## Tools available for IaC
 
 2 types of IaC tools:
-* Configuration management tools
-  * They install/configure software (after the infrastructure has been created)
-  * Examples:
-    * Chef
-    * Puppet
-    * Ansible
-* Orchestration tools
-  * Manage/orchestrate infrastructure
-  * Examples:
-    * CloudFormation (AWS)
-    * Hashicorp Terraform
-    * ARM/Bicep templates (Azure)
-    * Ansible (can do this, but best used as a configuration management tool)
+
+- Configuration management tools
+  - They install/configure software (after the infrastructure has been created)
+  - Examples:
+    - Chef
+    - Puppet
+    - Ansible
+- Orchestration tools
+  - Manage/orchestrate infrastructure
+  - Examples:
+    - CloudFormation (AWS)
+    - Hashicorp Terraform
+    - ARM/Bicep templates (Azure)
+    - Ansible (can do this, but best used as a configuration management tool)
 
 ## Links to Terraform and Ansible doc
 
