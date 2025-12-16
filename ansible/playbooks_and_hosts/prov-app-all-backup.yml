@@ -1,0 +1,139 @@
+---
+- name: Install app dependencies and run app
+  hosts: web
+  become: yes
+  vars:
+    db_host: "{{ hostvars[groups['db'][0]].ansible_host | default('127.0.0.1') }}"
+    app_env:
+      DB_HOST: "mongodb://{{ db_host }}:27017/posts"
+
+  tasks:
+    - name: Install curl
+      apt:
+        name: curl
+        update_cache: yes
+
+    - name: Add NodeSource Node.js 20 repo
+      shell: curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      args:
+        executable: /bin/bash
+
+    - name: Install Node.js and Nginx
+      apt:
+        name:
+          - nodejs
+          - nginx
+        state: present
+        update_cache: yes
+
+    - name: Clone the app repository
+      git:
+        repo: "https://github.com/sherinbinny/tech515-sparta-app.git"
+        dest: /home/ubuntu/app
+        force: yes
+
+    - name: Configure Nginx reverse proxy for app
+      copy:
+        dest: /etc/nginx/sites-available/sparta-app
+        content: |
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  proxy_pass http://localhost:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host $host;
+                  proxy_cache_bypass $http_upgrade;
+              }
+          }
+      notify: reload nginx
+
+    - name: Enable sparta-app site
+      file:
+        src: /etc/nginx/sites-available/sparta-app
+        dest: /etc/nginx/sites-enabled/sparta-app
+        state: link
+
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: reload nginx
+
+    - name: Install app dependencies
+      npm:
+        path: /home/ubuntu/app/app
+
+    - name: Install PM2 globally
+      npm:
+        name: pm2
+        global: yes
+
+    - name: Kill any process using port 3000
+      shell: fuser -k 3000/tcp || true
+
+    - name: Start app with PM2 in background
+      become_user: ubuntu
+      shell: |
+        pm2 delete sparta-app || true
+        pm2 start /home/ubuntu/app/app/app.js --name sparta-app --update-env
+        pm2 save
+      environment: "{{ app_env }}"
+
+    - name: Ensure PM2 startup on boot
+      become_user: ubuntu
+      shell: |
+        env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu
+        pm2 save
+
+  handlers:
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded
+
+
+- name: Install and configure MongoDB v7
+  hosts: db
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Import MongoDB public key
+      apt_key:
+        url: https://www.mongodb.org/static/pgp/server-7.0.asc
+        state: present
+
+    - name: Add MongoDB repository
+      apt_repository:
+        repo: "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/7.0 multiverse"
+        state: present
+        update_cache: yes
+
+    - name: Install MongoDB 7.0.6
+      apt:
+        name: mongodb-org=7.0.6
+        state: present
+        update_cache: yes
+
+    - name: Ensure bindIp set to 0.0.0.0
+      replace:
+        path: /etc/mongod.conf
+        regexp: '(^\s*bindIp:\s*).*'
+        replace: '  bindIp: 0.0.0.0'
+      notify: restart mongod
+
+    - name: Enable and start MongoDB
+      service:
+        name: mongod
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart mongod
+      service:
+        name: mongod
+        state: restarted

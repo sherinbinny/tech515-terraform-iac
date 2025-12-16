@@ -1,0 +1,29 @@
+# starts with --- (three dashes)
+---
+
+# name the play
+- name: install nginx play
+
+  # where do you want to run this play
+  hosts: web
+
+  # get comprehensive facts
+  gather_facts: yes
+
+  # provide super user access
+  become: true
+
+  tasks:  
+
+  - name: update apt cache
+    ansible.builtin.apt:
+      update_cache: yes
+
+  - name: upgrade all packages
+    ansible.builtin.apt:
+      upgrade: dist
+
+  - name: install nginx
+    apt: pkg=nginx state=present
+
+...

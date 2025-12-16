@@ -1,0 +1,9 @@
+[test:children]
+web
+db
+
+[web]
+ec2-app-instance ansible_host=172.31.49.101 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/tech515-sherin-aws.pem
+
+[db]
+ec2-db-instance ansible_host=172.31.57.254 ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/tech515-sherin-aws.pem

@@ -1,0 +1,43 @@
+---
+- name: install and configure mongo db v7
+  hosts: db
+  become: yes
+
+  tasks:  
+
+  - name: import Mongo DB public key
+    apt_key:
+      url: https://www.mongodb.org/static/pgp/server-7.0.asc
+      state: present
+
+  - name: Add the MongoDB repository
+    apt_repository:
+      repo: "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/7.0 multiverse"
+      state: present
+      update_cache: yes
+
+  - name: Install MongoDB 7.0.6
+    apt:
+      name: mongodb-org=7.0.6
+      # this makes sure it is installed, but not running
+      state: present
+      update_cache: yes
+
+  - name: Ensure bindIp set to 0.0.0.0
+    replace:
+      path: /etc/mongod.conf
+      regexp: 'bindIp:.*'
+      replace: 'bindIp: 0.0.0.0'
+    notify: restart mongod
+
+  - name: Ensure mongod enabled and started
+    service:
+      name: mongod
+      state: started
+      enabled: yes
+
+  handlers:
+    - name: restart mongod
+      service:
+        name: mongod
+        state: restarted

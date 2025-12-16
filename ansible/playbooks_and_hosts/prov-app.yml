@@ -1,0 +1,109 @@
+---
+- name: Install app dependencies and run app
+  hosts: web
+  become: no
+  vars:
+    db_host: "mongodb://{{ hostvars['ec2-db-instance'].ansible_host }}:27017/posts"
+
+  tasks:
+    - name: Install curl
+      apt:
+        name: curl
+        update_cache: yes
+      become: yes
+
+    - name: Add NodeSource Node.js 20 repo
+      shell: curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+      args:
+        executable: /bin/bash
+      become: yes
+
+    - name: Install Node.js & npm
+      apt:
+        name: nodejs
+        state: present
+        update_cache: yes
+      become: yes
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+      become: yes
+
+    - name: Clone the app repository
+      git:
+        repo: "https://github.com/sherinbinny/tech515-sparta-app.git"
+        dest: /home/ubuntu/app
+        force: yes
+      become: yes
+
+    - name: Remove default site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      become: yes
+      notify: reload nginx
+
+    - name: Configure Nginx reverse proxy for app
+      copy:
+        dest: /etc/nginx/sites-available/sparta-app
+        content: |
+          server {
+              listen 80;
+              server_name _;
+              
+              location / {
+                  proxy_pass http://localhost:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host $host;
+                  proxy_cache_bypass $http_upgrade;
+              }
+          }
+      become: yes
+      notify: reload nginx
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      become: yes
+
+    - name: Enable sparta-app site
+      file:
+        src: /etc/nginx/sites-available/sparta-app
+        dest: /etc/nginx/sites-enabled/sparta-app
+        state: link
+      become: yes
+      notify: reload nginx
+
+    - name: Install app dependencies
+      npm:
+        path: /home/ubuntu/app/app
+
+    - name: Install PM2 globally
+      npm:
+        name: pm2
+        global: yes
+        state: present
+      become: yes
+
+    - name: Stop any old PM2 processes
+      shell: pm2 delete all || true
+      args:
+        chdir: /home/ubuntu/app/app
+
+    - name: Start app in background with DB_HOST
+      shell: |
+        pm2 start /home/ubuntu/app/app/app.js --name sparta-app --update-env
+      args:
+        chdir: /home/ubuntu/app/app
+      environment:
+        DB_HOST: "{{ db_host }}"
+
+  handlers:
+    - name: reload nginx
+      service:
+        name: nginx
+        state: reloaded

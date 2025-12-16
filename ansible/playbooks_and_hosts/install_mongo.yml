@@ -1,0 +1,27 @@
+---
+- name: install mongo db v7
+  hosts: db
+  become: yes
+  gather_facts: yes
+
+  tasks:  
+
+  - name: import Mongo DB public key
+    ansible.builtin.apt_key:
+      url: https://www.mongodb.org/static/pgp/server-7.0.asc
+      state: present
+
+  - name: Add the MongoDB repository
+    ansible.builtin.apt_repository:
+      # "ansible_distribution_release" gets value of Ubuntu's codename which was set by "gather_facts: yes" above
+      # it gets the same value as the command "lsb_release -cs" e.g. "jammy"
+      repo: "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu {{ ansible_distribution_release }}/mongodb-org/7.0 multiverse"
+      state: present
+      update_cache: yes
+
+  - name: Install MongoDB 7.0.6
+    ansible.builtin.apt:
+      name: mongodb-org=7.0.6
+      # this makes sure it is installed, but not running
+      state: present
+      update_cache: yes
